@@ -1,0 +1,7 @@
+{
+  "type": "module",
+  "dependencies": {
+    "fuzzball": "^2.2.6",
+    "plaud": "^0.1.12"
+  }
+}
