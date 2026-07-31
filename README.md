@@ -2,6 +2,10 @@
 
 This project is a Node.js automation script that integrates with the **Plaud CLI** to fetch your audio recording summaries, match them against a database of target physical addresses (using fuzzy string matching and UK postcode matching), and output a structured audit report.
 
+<img width="1853" height="870" alt="image" src="https://github.com/user-attachments/assets/709fe8cc-8c90-4296-9761-75dc6c766313" />
+
+ To run the webdemo use "node webdemo.js"
+
 ## Features
 
 - **Automated Plaud CLI Integration**: Retrieves a list of all your recordings, details, and summaries directly using the Plaud CLI commands (`plaud files`, `plaud file`, `plaud summary`).
@@ -57,6 +61,10 @@ This project is a Node.js automation script that integrates with the **Plaud CLI
 3. **Run the script**:
    ```bash
    node script.js
+   ```
+4. ** Run the webdemo"":
+ ```bash
+   node webdemo.js
    ```
 
 ---
