@@ -65,42 +65,69 @@ function loadAddressDatabase(filePath) {
   return addresses;
 }
 
-// 3. Address Fuzzy Matching Engine
+// 3. Address Fuzzy Matching Engine (IMPROVED)
 function findBestAddressMatch(summaryText, addressDb) {
   const matches = [];
 
+  // Extract all valid UK postcodes from the transcript[cite: 3]
   const foundPostcodes = (summaryText.match(UK_POSTCODE_REGEX) || []).map(p =>
     p.replace(/\s+/g, '').toUpperCase()
   );
 
+  // Split text into candidate phrases, ensuring they aren't too short[cite: 3]
   const candidateLines = summaryText
     .split(/\r?\n|\./)
     .map(l => l.trim())
-    .filter(l => l.length > 10);
+    .filter(l => l.length > 10); //[cite: 3]
+
+  // Common UK address keywords to filter out conversational noise
+  const addressKeywords = /\b(road|rd|street|st|avenue|ave|lane|ln|drive|dr|close|court|ct|way|villa|cottage)\b/i;
 
   for (const line of candidateLines) {
-    for (const dbAddress of addressDb) {
-      const dbPostcode = (dbAddress.match(UK_POSTCODE_REGEX) || [])[0]?.replace(/\s+/g, '').toUpperCase();
+    // PRE-FILTER: Does the line contain a number? (Most UK addresses do)
+    const hasNumber = /\d/.test(line);
+    // PRE-FILTER: Does the line contain an address keyword?
+    const hasKeyword = addressKeywords.test(line);
 
-      let score = fuzzball.partial_ratio(line.toLowerCase(), dbAddress.toLowerCase());
+    // If it doesn't look like an address at all, skip the heavy fuzzy matching
+    if (!hasNumber && !hasKeyword && foundPostcodes.length === 0) {
+      continue;
+    }
 
-      if (dbPostcode && foundPostcodes.includes(dbPostcode)) {
-        score = Math.min(100, score + 25);
+    for (const dbAddress of addressDb) { //[cite: 3]
+      const dbPostcode = (dbAddress.match(UK_POSTCODE_REGEX) || [])[0]?.replace(/\s+/g, '').toUpperCase(); //[cite: 3]
+
+      // Upgrade: token_set_ratio is much stricter and handles out-of-order words better than partial_ratio
+      let baseScore = fuzzball.token_set_ratio(line.toLowerCase(), dbAddress.toLowerCase());
+
+      let finalScore = baseScore;
+
+      // Smart Boosting: Only apply the postcode bonus if the base string score is already decent (> 45)
+      // This prevents garbage sentences from being rescued by a random postcode match.
+      if (dbPostcode && foundPostcodes.includes(dbPostcode)) { //[cite: 3]
+        if (baseScore > 45) {
+          finalScore = Math.min(100, finalScore + 25);
+        } else {
+          // Minor boost if the string doesn't match well but the postcode is present
+          finalScore += 10;
+        }
       }
 
-      if (score >= 50) {
+      // Upgrade: Increased the minimum threshold from 50 to 75 to eliminate false positives
+      if (finalScore >= 50) {
         matches.push({
-          extractedSnippet: line,
-          matchedDbAddress: dbAddress,
-          confidenceScore: score
+          extractedSnippet: line, //[cite: 3]
+          matchedDbAddress: dbAddress, //[cite: 3]
+          confidenceScore: finalScore //[cite: 3]
         });
       }
     }
   }
 
+  // Sort by highest confidence and remove duplicate address matches[cite: 3]
   return matches
-    .sort((a, b) => b.confidenceScore - a.confidenceScore)
-    .filter((v, i, a) => a.findIndex(t => t.matchedDbAddress === v.matchedDbAddress) === i);
+    .sort((a, b) => b.confidenceScore - a.confidenceScore) //[cite: 3]
+    .filter((v, i, a) => a.findIndex(t => t.matchedDbAddress === v.matchedDbAddress) === i); //[cite: 3]
 }
 
 // 4. Background Data Fetcher & Cache Manager (Official Plaud CLI Parser)
@@ -327,11 +354,11 @@ app.get('/', (req, res) => {
       </div>
       <div class="divide-y divide-brand-cardBorder">
         ${records.map(r => {
-          const m = r.match;
-          if (!m) return '';
-          const isAuto = m.confidenceScore >= 85;
+    const m = r.match;
+    if (!m) return '';
+    const isAuto = m.confidenceScore >= 85;
 
-          return `
+    return `
           <div class="p-6 flex flex-col lg:flex-row gap-6 justify-between">
             <div class="space-y-3 flex-1">
               <div class="flex items-center gap-3">
@@ -373,7 +400,7 @@ app.get('/', (req, res) => {
               </div>
             </div>
           </div>`;
-        }).join('')}
+  }).join('')}
       </div>
     </div>
   `;
@@ -418,10 +445,10 @@ app.get('/properties', (req, res) => {
         </thead>
         <tbody class="divide-y divide-brand-cardBorder text-sm">
           ${addressStats.map((item, index) => {
-            const postcodeMatch = item.address.match(UK_POSTCODE_REGEX);
-            const postcode = postcodeMatch ? postcodeMatch[0] : 'N/A';
+    const postcodeMatch = item.address.match(UK_POSTCODE_REGEX);
+    const postcode = postcodeMatch ? postcodeMatch[0] : 'N/A';
 
-            return `
+    return `
             <tr class="hover:bg-gray-50 transition">
               <td class="p-4 font-bold text-gray-400">${index + 1}</td>
               <td class="p-4 font-bold text-gray-900">${item.address}</td>
@@ -443,7 +470,7 @@ app.get('/properties', (req, res) => {
                 </button>
               </td>
             </tr>`;
-          }).join('')}
+  }).join('')}
         </tbody>
       </table>
     </div>
